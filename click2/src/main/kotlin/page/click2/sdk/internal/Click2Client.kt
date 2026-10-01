@@ -81,12 +81,36 @@ internal class Click2Client(
     }
 
     /** Reports an install. Returns the HTTP status, or null when there was no answer. */
-    fun reportInstall(clickedUrl: String, host: String): Int? {
+    fun reportInstall(clickedUrl: String, host: String, userId: String? = null): Int? {
         val body = JSONObject()
             .put("type", "install")
             .put("url", clickedUrl)
             .put("platform", platform)
             .apply { appVersion?.let { put("appVersion", it.take(32)) } }
+            .apply { userId?.let { put("userId", it) } }
+            .toString()
+        return send { timeout ->
+            transport.execute("POST", "https://$host/api/v1/events", headers() + ("Content-Type" to "application/json"), body, timeout)
+        }?.status
+    }
+
+    /**
+     * Reports an in-app event. Returns the HTTP status, or null when there was no answer.
+     * [properties] values must be String, Number or Boolean (others are dropped by the caller).
+     */
+    fun reportEvent(name: String, revenue: Double?, currency: String?, properties: Map<String, Any>, link: String?, userId: String?, host: String): Int? {
+        val body = JSONObject()
+            .put("type", "event")
+            .put("name", name)
+            .put("platform", platform)
+            .apply {
+                revenue?.let { put("revenue", it) }
+                currency?.let { put("currency", it) }
+                if (properties.isNotEmpty()) put("properties", JSONObject(properties))
+                link?.let { put("url", it) }
+                userId?.let { put("userId", it) }
+                appVersion?.let { put("appVersion", it.take(32)) }
+            }
             .toString()
         return send { timeout ->
             transport.execute("POST", "https://$host/api/v1/events", headers() + ("Content-Type" to "application/json"), body, timeout)

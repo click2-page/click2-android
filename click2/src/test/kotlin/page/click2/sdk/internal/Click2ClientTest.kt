@@ -151,4 +151,48 @@ class Click2ClientTest {
         assertEquals("android", body.getString("platform"))
         assertEquals("5.1.0", body.getString("appVersion"))
     }
+
+    @Test
+    fun `in-app events carry name, revenue, properties, the attributed link and the user id`() {
+        val status = client({ HttpResponse(204, null) }).reportEvent(
+            name = "purchase",
+            revenue = 24.99,
+            currency = "USD",
+            properties = mapOf("sku" to "A1", "quantity" to 2, "gift" to true),
+            link = "https://acme.click2.page/fall",
+            userId = "u-42",
+            host = "acme.click2.page",
+        )
+        assertEquals(204, status)
+        val request = requests.single()
+        assertEquals("https://acme.click2.page/api/v1/events", request.url)
+        val body = JSONObject(request.body!!)
+        assertEquals("event", body.getString("type"))
+        assertEquals("purchase", body.getString("name"))
+        assertEquals(24.99, body.getDouble("revenue"), 0.0)
+        assertEquals("USD", body.getString("currency"))
+        assertEquals("https://acme.click2.page/fall", body.getString("url"))
+        assertEquals("u-42", body.getString("userId"))
+        assertEquals("5.1.0", body.getString("appVersion"))
+        val props = body.getJSONObject("properties")
+        assertEquals("A1", props.getString("sku"))
+        assertEquals(2, props.getInt("quantity"))
+        assertTrue(props.getBoolean("gift"))
+    }
+
+    @Test
+    fun `events without attribution or user id leave those fields out`() {
+        client({ HttpResponse(204, null) }).reportEvent("sign_up", null, null, emptyMap(), null, null, "acme.click2.page")
+        val body = JSONObject(requests.single().body!!)
+        assertFalse(body.has("url"))
+        assertFalse(body.has("userId"))
+        assertFalse(body.has("revenue"))
+        assertFalse(body.has("properties"))
+    }
+
+    @Test
+    fun `install reports carry the user id`() {
+        client({ HttpResponse(204, null) }).reportInstall("https://acme.click2.page/subs", "acme.click2.page", "u-7")
+        assertEquals("u-7", JSONObject(requests.single().body!!).getString("userId"))
+    }
 }

@@ -88,6 +88,20 @@ if (legacyPrefs.getBoolean("install_referrer_checked", false)) Click2.markDeferr
 
 **Java and non-coroutine code** can use `Click2.resolve(uri, callback)`, `Click2.handle(intent, callback)` and `Click2.checkDeferredLink(callback)`. The callbacks run on the main thread but aren't lifecycle-aware (they may run after the Activity is destroyed); in Kotlin, prefer the suspend functions with `lifecycleScope`.
 
+## In-app events and revenue
+
+Record what users do after a link brought them in; the click2 dashboard shows each campaign's events and revenue.
+
+```kotlin
+Click2.userId = account.id            // optional; sent to the team's integrations (e.g. Braze). null after sign-out.
+lifecycleScope.launch { Click2.track("purchase", revenue = 24.99, currency = "USD", properties = mapOf("sku" to "A1", "quantity" to 2)) }
+Click2.trackInBackground("sign_up")   // Java / fire-and-forget
+```
+
+An event is credited to the click2 link that last opened the app within `attributionWindowMillis` (default 7 days,
+in `Click2Config`). Names are up to 64 letters, digits, spaces or `_ . : -`; up to 10 properties (String, Number or
+Boolean). Nothing is sent while `isTrackingEnabled` is `false`. `track` returns whether click2 accepted the event.
+
 ## Notes
 
 - Uses `HttpURLConnection` and `org.json` from Android, so it can't clash with the app's OkHttp or Ktor versions. The AAR is about 60 KB.
@@ -122,6 +136,8 @@ if (legacyPrefs.getBoolean("install_referrer_checked", false)) Click2.markDeferr
 | `~campaign`, `~channel`, `~feature` | `link.campaign`, `link.channel`, `link.feature` |
 | `~referring_link` query merged into the path | already merged by the server |
 | `disableTracking` / `setTrackingDisabled` | `isTrackingEnabled = false` |
+| `BranchEvent(BRANCH_STANDARD_EVENT.PURCHASE)…logEvent()` | `Click2.track("purchase", revenue, currency, properties)` |
+| `setIdentity` / `logout` | `Click2.userId = id` / `null` |
 | test key / `*.test-app.link` | test environment host `<team>-test.click2.page` |
 
 ## Development

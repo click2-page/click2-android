@@ -11,6 +11,8 @@ package page.click2.sdk
  * @param logging logs to Logcat under the `Click2` tag (for debug builds). Nothing is logged otherwise.
  * @param deferredLinkMaxAgeMillis a deferred link is only taken from the install referrer when the
  *   app was installed at most this long ago (default 7 days), so app updates and restores don't replay it.
+ * @param attributionWindowMillis how long the last click2 link that opened the app gets credit for
+ *   [Click2.track] events (default 7 days).
  */
 data class Click2Config @JvmOverloads constructor(
     val hosts: List<String>,
@@ -18,6 +20,7 @@ data class Click2Config @JvmOverloads constructor(
     val timeoutMillis: Int = 10_000,
     val logging: Boolean = false,
     val deferredLinkMaxAgeMillis: Long = 7 * 24 * 60 * 60 * 1000L,
+    val attributionWindowMillis: Long = 7 * 24 * 60 * 60 * 1000L,
 ) {
     init {
         require(hosts.isNotEmpty()) { "Click2Config needs at least one link host" }
@@ -29,6 +32,7 @@ data class Click2Config @JvmOverloads constructor(
         }
         require(timeoutMillis in 1..60_000) { "timeoutMillis must be between 1 and 60000, was $timeoutMillis" }
         require(deferredLinkMaxAgeMillis > 0) { "deferredLinkMaxAgeMillis must be positive" }
+        require(attributionWindowMillis >= 0) { "attributionWindowMillis can't be negative" }
     }
 
     private companion object {

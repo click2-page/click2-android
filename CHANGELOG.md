@@ -4,6 +4,10 @@ All notable changes to the click2 Android SDK. The format follows [Keep a Change
 
 ## [Unreleased]
 
+- In-app events and revenue: `Click2.track(name, revenue, currency, properties)` (suspend) and `trackInBackground`,
+  credited to the link that last opened the app within `Click2Config.attributionWindowMillis` (default 7 days).
+- `Click2.userId`: your user id, sent with installs and events for the team's integrations.
+
 ## [0.2.0] - 2026-09-30
 
 First public release.

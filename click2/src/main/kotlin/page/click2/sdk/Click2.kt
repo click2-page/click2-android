@@ -40,6 +40,10 @@ object Click2 {
     private const val PLATFORM = "android"
     private const val PREFS = "page.click2.sdk"
     private const val KEY_TRACKING = "tracking_enabled"
+    private const val KEY_USER_ID = "user_id"
+    private const val KEY_LAST_LINK = "last_link_url"
+    private const val KEY_LAST_HOST = "last_link_host"
+    private const val KEY_LAST_AT = "last_link_at"
 
     /** Headroom over [Click2Config.timeoutMillis] before a resolve is abandoned regardless of the socket. */
     private const val HARD_CAP_SLACK_MILLIS = 2_000L
@@ -86,7 +90,7 @@ object Click2 {
             readReferrer = { readInstallReferrer(app) },
             linkFromReferrer = { ReferrerParser.smartLink(it, matcher) },
             resolve = { resolveLink(s, it) },
-            reportInstall = { link -> matcher.hostOf(link)?.let { client.reportInstall(link, it) } ?: 400 },
+            reportInstall = { link -> matcher.hostOf(link)?.let { client.reportInstall(link, it, prefs.getString(KEY_USER_ID, null)) } ?: 400 },
             trackingEnabled = { prefs.getBoolean(KEY_TRACKING, true) },
         )
         state = s
@@ -182,7 +186,61 @@ object Click2 {
         val result = withTimeoutOrNull(s.config.timeoutMillis + HARD_CAP_SLACK_MILLIS) { work.await() }
             ?: Click2Result.Failed(Click2Result.Failed.Reason.NETWORK_ERROR, url).also { work.cancel() }
         Click2Log.d("resolved $url -> $result")
+        if (result is Click2Result.OpenRoute || result is Click2Result.OpenWeb) {
+            // The link that opened the app, for attributing track() events.
+            s.prefs.edit().putString(KEY_LAST_LINK, url).putString(KEY_LAST_HOST, host).putLong(KEY_LAST_AT, System.currentTimeMillis()).apply()
+        }
         return result
+    }
+
+    // ---------------------------------------------------------------- in-app events
+
+    /**
+     * Your own id for the signed-in user (or `null` after sign-out). Sent with installs and [track] events so the
+     * team's integrations (e.g. Braze) can match them to the user. Remembered across launches.
+     */
+    @JvmStatic
+    var userId: String?
+        get() = requireState().prefs.getString(KEY_USER_ID, null)
+        set(value) {
+            val trimmed = value?.trim()?.take(128)
+            requireState().prefs.edit().apply { if (trimmed.isNullOrEmpty()) remove(KEY_USER_ID) else putString(KEY_USER_ID, trimmed) }.apply()
+        }
+
+    /**
+     * Records an in-app event, e.g. `Click2.track("purchase", revenue = 24.99, currency = "USD")`.
+     * Credited to the click2 link that last opened the app (within [Click2Config.attributionWindowMillis]), so the
+     * dashboard shows what each campaign brought in. Names: up to 64 letters, digits, spaces or `_ . : -`; up to 10
+     * properties with String, Number or Boolean values (others are dropped). Returns whether click2 accepted it.
+     * Nothing is sent while tracking is off.
+     */
+    suspend fun track(name: String, revenue: Double? = null, currency: String? = null, properties: Map<String, Any> = emptyMap()): Boolean {
+        val s = requireState()
+        if (!s.prefs.getBoolean(KEY_TRACKING, true)) {
+            Click2Log.d("tracking is off: $name not recorded")
+            return false
+        }
+        val lastAt = s.prefs.getLong(KEY_LAST_AT, 0L)
+        val lastHost = s.prefs.getString(KEY_LAST_HOST, null)
+        val recent = lastAt > 0 && System.currentTimeMillis() - lastAt <= s.config.attributionWindowMillis && lastHost != null && lastHost in s.config.hosts
+        val link = if (recent) s.prefs.getString(KEY_LAST_LINK, null) else null
+        val host = if (recent) lastHost!! else s.config.hosts.first()
+        val props = properties.filter { (k, v) ->
+            (v is String || v is Number || v is Boolean).also { ok -> if (!ok) Click2Log.w("track: property $k dropped (use text, a number or true/false)") }
+        }
+        val user = s.prefs.getString(KEY_USER_ID, null)
+        val work = scope.async { runCatching { s.client.reportEvent(name, revenue, currency, props, link, user, host) }.getOrNull() }
+        val status = withTimeoutOrNull(s.config.timeoutMillis + HARD_CAP_SLACK_MILLIS) { work.await() }
+        Click2Log.d(if (status in 200..299) "tracked $name" else "track $name failed ($status)")
+        return status in 200..299
+    }
+
+    /** [track] for Java and non-coroutine callers; [callback] (optional) runs on the main thread. */
+    @JvmStatic
+    @JvmOverloads
+    fun trackInBackground(name: String, revenue: Double? = null, currency: String? = null, properties: Map<String, Any> = emptyMap(), callback: ((Boolean) -> Unit)? = null) {
+        requireState()
+        callbackScope.launch { val ok = track(name, revenue, currency, properties); callback?.invoke(ok) }
     }
 
     private fun firstInstallTime(context: Context): Long = try {
