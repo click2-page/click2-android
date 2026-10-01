@@ -108,7 +108,7 @@ internal class DeferredLinkManager(
         installLink?.let(::sendInstall)
         // No click2 link, but maybe a Play Store campaign: click2 reads its UTM tags (once, best effort).
         val raw = (referrer as? ReferrerResult.Available)?.referrer
-        if (link == null && raw != null && raw.contains("utm_") && trackingEnabled() && reportReferrerInstall != null) {
+        if (link == null && raw != null && CAMPAIGN_KEYS.any { raw.contains(it) } && trackingEnabled() && reportReferrerInstall != null) {
             scope.launch { runCatching { reportReferrerInstall.invoke(raw) }.onFailure { Click2Log.w("referrer install report failed", it) } }
         }
         return link?.let { resolvePending(it) }
@@ -149,5 +149,8 @@ internal class DeferredLinkManager(
 
     companion object {
         const val MAX_ATTEMPTS = 5
+
+        /** Referrer parameters that mean a campaign (UTM tags; Google Ads click ids). */
+        val CAMPAIGN_KEYS = listOf("utm_", "gclid=", "gbraid=", "wbraid=")
     }
 }
