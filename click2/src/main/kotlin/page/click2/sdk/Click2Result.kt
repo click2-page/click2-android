@@ -52,4 +52,6 @@ data class Click2Link(
     val campaign: String?,
     val channel: String?,
     val feature: String?,
+    /** The click2 link itself, when it differs from [url] (e.g. [url] is an email click-tracking URL). */
+    val linkUrl: String? = null,
 )

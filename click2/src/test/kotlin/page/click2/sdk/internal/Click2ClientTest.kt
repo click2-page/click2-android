@@ -195,4 +195,13 @@ class Click2ClientTest {
         client({ HttpResponse(204, null) }).reportInstall("https://acme.click2.page/subs", "acme.click2.page", "u-7")
         assertEquals("u-7", JSONObject(requests.single().body!!).getString("userId"))
     }
+
+    @Test
+    fun `resolve passes on the click2 link behind an email click-tracking URL`() {
+        val result = client({ HttpResponse(200, """{"alias":"fall","deeplinkPath":"deals/fall","webOnly":false,"mobileWebOnly":false,"webUrl":"https://www.acme.com","link":"https://acme.click2.page/fall"}""") })
+            .resolve("https://email.acme.com/ls/click?upn=1", "email.acme.com")
+        assertTrue(result is Click2Result.OpenRoute)
+        assertEquals("https://acme.click2.page/fall", (result as Click2Result.OpenRoute).link.linkUrl)
+        assertEquals("https://email.acme.com/ls/click?upn=1", result.link.url)
+    }
 }

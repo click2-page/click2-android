@@ -41,9 +41,12 @@ object Click2 {
     private const val PREFS = "page.click2.sdk"
     private const val KEY_TRACKING = "tracking_enabled"
     private const val KEY_USER_ID = "user_id"
-    private const val KEY_LAST_LINK = "last_link_url"
-    private const val KEY_LAST_HOST = "last_link_host"
-    private const val KEY_LAST_AT = "last_link_at"
+    /** The link that last opened the app: `{"url", "host", "at"}` in one value, so it's never half-written. */
+    private const val KEY_LAST_LINK = "last_link"
+
+    /** A user id set before [configure] (apps restore the signed-in user early); saved on configure. */
+    @Volatile private var pendingUserId: String? = null
+    @Volatile private var pendingUserIdSet = false
 
     /** Headroom over [Click2Config.timeoutMillis] before a resolve is abandoned regardless of the socket. */
     private const val HARD_CAP_SLACK_MILLIS = 2_000L
@@ -94,6 +97,10 @@ object Click2 {
             trackingEnabled = { prefs.getBoolean(KEY_TRACKING, true) },
         )
         state = s
+        if (pendingUserIdSet) {
+            userId = pendingUserId
+            pendingUserIdSet = false
+        }
         Click2Log.d("configured for ${config.hosts}")
     }
 
@@ -186,9 +193,16 @@ object Click2 {
         val result = withTimeoutOrNull(s.config.timeoutMillis + HARD_CAP_SLACK_MILLIS) { work.await() }
             ?: Click2Result.Failed(Click2Result.Failed.Reason.NETWORK_ERROR, url).also { work.cancel() }
         Click2Log.d("resolved $url -> $result")
-        if (result is Click2Result.OpenRoute || result is Click2Result.OpenWeb) {
-            // The link that opened the app, for attributing track() events.
-            s.prefs.edit().putString(KEY_LAST_LINK, url).putString(KEY_LAST_HOST, host).putLong(KEY_LAST_AT, System.currentTimeMillis()).apply()
+        val link = when (result) {
+            is Click2Result.OpenRoute -> result.link
+            is Click2Result.OpenWeb -> result.link
+            else -> null
+        }
+        if (link != null) {
+            // For attributing track() events: the click2 link (behind an email click-tracking URL, the one it led to);
+            // events still go to the host that was opened.
+            val value = org.json.JSONObject().put("url", link.linkUrl ?: url).put("host", host).put("at", System.currentTimeMillis())
+            s.prefs.edit().putString(KEY_LAST_LINK, value.toString()).apply()
         }
         return result
     }
@@ -201,10 +215,17 @@ object Click2 {
      */
     @JvmStatic
     var userId: String?
-        get() = requireState().prefs.getString(KEY_USER_ID, null)
+        get() = state?.prefs?.getString(KEY_USER_ID, null) ?: pendingUserId.takeIf { pendingUserIdSet }
         set(value) {
-            val trimmed = value?.trim()?.take(128)
-            requireState().prefs.edit().apply { if (trimmed.isNullOrEmpty()) remove(KEY_USER_ID) else putString(KEY_USER_ID, trimmed) }.apply()
+            val trimmed = value?.trim()?.take(128)?.takeIf { it.isNotEmpty() }
+            val s = state
+            if (s == null) {
+                // Before configure: kept and saved by configure().
+                pendingUserId = trimmed
+                pendingUserIdSet = true
+                return
+            }
+            s.prefs.edit().apply { if (trimmed == null) remove(KEY_USER_ID) else putString(KEY_USER_ID, trimmed) }.apply()
         }
 
     /**
@@ -220,27 +241,35 @@ object Click2 {
             Click2Log.d("tracking is off: $name not recorded")
             return false
         }
-        val lastAt = s.prefs.getLong(KEY_LAST_AT, 0L)
-        val lastHost = s.prefs.getString(KEY_LAST_HOST, null)
-        val recent = lastAt > 0 && System.currentTimeMillis() - lastAt <= s.config.attributionWindowMillis && lastHost != null && lastHost in s.config.hosts
-        val link = if (recent) s.prefs.getString(KEY_LAST_LINK, null) else null
-        val host = if (recent) lastHost!! else s.config.hosts.first()
+        val saved = s.prefs.getString(KEY_LAST_LINK, null)?.let { runCatching { org.json.JSONObject(it) }.getOrNull() }
+        val age = saved?.let { System.currentTimeMillis() - it.optLong("at", 0L) }
+        val savedHost = saved?.optString("host")
+        // A negative age means the clock was turned back: don't trust it.
+        val recent = saved != null && age != null && age >= 0 && age <= s.config.attributionWindowMillis && savedHost in s.config.hosts
+        val link = if (recent) saved!!.optString("url").takeIf { it.isNotEmpty() } else null
+        val host = if (recent) savedHost!! else s.config.hosts.first()
         val props = properties.filter { (k, v) ->
             (v is String || v is Number || v is Boolean).also { ok -> if (!ok) Click2Log.w("track: property $k dropped (use text, a number or true/false)") }
         }
         val user = s.prefs.getString(KEY_USER_ID, null)
         val work = scope.async { runCatching { s.client.reportEvent(name, revenue, currency, props, link, user, host) }.getOrNull() }
         val status = withTimeoutOrNull(s.config.timeoutMillis + HARD_CAP_SLACK_MILLIS) { work.await() }
+        if (status == null) work.cancel()
         Click2Log.d(if (status in 200..299) "tracked $name" else "track $name failed ($status)")
         return status in 200..299
+    }
+
+    /** Result of [trackInBackground]: whether click2 accepted the event. */
+    fun interface TrackCallback {
+        fun onTracked(accepted: Boolean)
     }
 
     /** [track] for Java and non-coroutine callers; [callback] (optional) runs on the main thread. */
     @JvmStatic
     @JvmOverloads
-    fun trackInBackground(name: String, revenue: Double? = null, currency: String? = null, properties: Map<String, Any> = emptyMap(), callback: ((Boolean) -> Unit)? = null) {
+    fun trackInBackground(name: String, revenue: Double? = null, currency: String? = null, properties: Map<String, Any> = emptyMap(), callback: TrackCallback? = null) {
         requireState()
-        callbackScope.launch { val ok = track(name, revenue, currency, properties); callback?.invoke(ok) }
+        callbackScope.launch { val ok = track(name, revenue, currency, properties); callback?.onTracked(ok) }
     }
 
     private fun firstInstallTime(context: Context): Long = try {
