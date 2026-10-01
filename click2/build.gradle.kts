@@ -5,7 +5,7 @@ plugins {
 
 // Released from a git tag (vX.Y.Z) by .github/workflows/release.yml; keep in sync with CHANGELOG.md.
 group = "page.click2"
-version = "0.2.0"
+version = "0.3.0"
 
 android {
     namespace = "page.click2.sdk"

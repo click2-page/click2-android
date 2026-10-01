@@ -4,8 +4,11 @@ All notable changes to the click2 Android SDK. The format follows [Keep a Change
 
 ## [Unreleased]
 
-- Play Store campaign installs (UTM / gclid in the install referrer) without a click2 link are reported for attribution.
+## [0.3.0] - 2026-10-01
 
+- Play Store campaign installs (UTM / gclid in the install referrer) without a click2 link are reported for attribution.
+- `Click2Link.variant` (the link rule or A/B variant), remembered for event attribution; requests send `Accept-Language`
+  (link rules by language).
 - In-app events and revenue: `Click2.track(name, revenue, currency, properties)` (suspend) and `trackInBackground`,
   credited to the link that last opened the app within `Click2Config.attributionWindowMillis` (default 7 days).
 - `Click2.userId`: your user id, sent with installs and events for the team's integrations.
@@ -22,5 +25,6 @@ First public release.
 - Install and open attribution, with a tracking switch (`isTrackingEnabled`) for consent.
 - Only the configured link hosts are ever contacted.
 
-[Unreleased]: https://github.com/click2-page/click2-android/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/click2-page/click2-android/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/click2-page/click2-android/releases/tag/v0.3.0
 [0.2.0]: https://github.com/click2-page/click2-android/releases/tag/v0.2.0
