@@ -94,6 +94,20 @@ internal class Click2Client(
         }?.status
     }
 
+    /** Reports an install from a Play Store campaign (no click2 link) with its raw install referrer. */
+    fun reportReferrerInstall(referrer: String, host: String, userId: String? = null): Int? {
+        val body = JSONObject()
+            .put("type", "install")
+            .put("referrer", referrer.take(1000))
+            .put("platform", platform)
+            .apply { appVersion?.let { put("appVersion", it.take(32)) } }
+            .apply { userId?.let { put("userId", it) } }
+            .toString()
+        return send { timeout ->
+            transport.execute("POST", "https://$host/api/v1/events", headers() + ("Content-Type" to "application/json"), body, timeout)
+        }?.status
+    }
+
     /**
      * Reports an in-app event. Returns the HTTP status, or null when there was no answer.
      * [properties] values must be String, Number or Boolean (others are dropped by the caller).

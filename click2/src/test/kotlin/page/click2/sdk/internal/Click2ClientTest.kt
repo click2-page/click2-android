@@ -212,4 +212,13 @@ class Click2ClientTest {
         assertTrue(request.headers["Accept-Language"]!!.isNotEmpty())
         assertEquals("b", JSONObject(request.body!!).getString("variant"))
     }
+
+    @Test
+    fun `campaign installs without a click2 link send the raw referrer`() {
+        client({ HttpResponse(204, null) }).reportReferrerInstall("utm_source=tiktok&utm_medium=paid", "acme.click2.page")
+        val body = JSONObject(requests.single().body!!)
+        assertEquals("install", body.getString("type"))
+        assertEquals("utm_source=tiktok&utm_medium=paid", body.getString("referrer"))
+        assertFalse(body.has("url"))
+    }
 }

@@ -47,6 +47,8 @@ internal class DeferredLinkManager(
     /** Blocking; returns the HTTP status or null without an answer. */
     private val reportInstall: (String) -> Int?,
     private val trackingEnabled: () -> Boolean,
+    /** Installs from a Play Store campaign (UTM tags / gclid) without a click2 link: the raw referrer; blocking. */
+    private val reportReferrerInstall: ((String) -> Int?)? = null,
 ) {
     private val lock = Any()
     private var work: Deferred<Click2Result?>? = null
@@ -104,6 +106,11 @@ internal class DeferredLinkManager(
         val installLink = link?.takeIf { trackingEnabled() }
         update { DeferredState(checkedInstallTime = installTime, pendingLink = link, pendingInstallLink = installLink) }
         installLink?.let(::sendInstall)
+        // No click2 link, but maybe a Play Store campaign: click2 reads its UTM tags (once, best effort).
+        val raw = (referrer as? ReferrerResult.Available)?.referrer
+        if (link == null && raw != null && raw.contains("utm_") && trackingEnabled() && reportReferrerInstall != null) {
+            scope.launch { runCatching { reportReferrerInstall.invoke(raw) }.onFailure { Click2Log.w("referrer install report failed", it) } }
+        }
         return link?.let { resolvePending(it) }
     }
 

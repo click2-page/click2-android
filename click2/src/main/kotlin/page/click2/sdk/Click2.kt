@@ -95,6 +95,7 @@ object Click2 {
             resolve = { resolveLink(s, it) },
             reportInstall = { link -> matcher.hostOf(link)?.let { client.reportInstall(link, it, prefs.getString(KEY_USER_ID, null)) } ?: 400 },
             trackingEnabled = { prefs.getBoolean(KEY_TRACKING, true) },
+            reportReferrerInstall = { referrer -> client.reportReferrerInstall(referrer, config.hosts.first(), prefs.getString(KEY_USER_ID, null)) },
         )
         state = s
         if (pendingUserIdSet) {

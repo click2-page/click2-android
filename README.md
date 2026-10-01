@@ -102,6 +102,12 @@ An event is credited to the click2 link that last opened the app within `attribu
 in `Click2Config`). Names are up to 64 letters, digits, spaces or `_ . : -`; up to 10 properties (String, Number or
 Boolean). Nothing is sent while `isTrackingEnabled` is `false`. `track` returns whether click2 accepted the event.
 
+## Play Store campaigns
+
+Installs from a Play Store campaign link (UTM tags, or `gclid` from Google Ads) without a click2 link are reported
+once with their install referrer; click2 shows them in analytics by channel (`utm_source/utm_medium`, or
+`google_ads`) and campaign. Nothing extra to call.
+
 ## Notes
 
 - Uses `HttpURLConnection` and `org.json` from Android, so it can't clash with the app's OkHttp or Ktor versions. The AAR is about 60 KB.
