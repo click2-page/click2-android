@@ -204,4 +204,12 @@ class Click2ClientTest {
         assertEquals("https://acme.click2.page/fall", (result as Click2Result.OpenRoute).link.linkUrl)
         assertEquals("https://email.acme.com/ls/click?upn=1", result.link.url)
     }
+
+    @Test
+    fun `requests send the device language and events the variant`() {
+        client({ HttpResponse(204, null) }).reportEvent("purchase", null, null, emptyMap(), "https://acme.click2.page/x", null, "acme.click2.page", "b")
+        val request = requests.single()
+        assertTrue(request.headers["Accept-Language"]!!.isNotEmpty())
+        assertEquals("b", JSONObject(request.body!!).getString("variant"))
+    }
 }

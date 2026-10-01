@@ -98,7 +98,7 @@ internal class Click2Client(
      * Reports an in-app event. Returns the HTTP status, or null when there was no answer.
      * [properties] values must be String, Number or Boolean (others are dropped by the caller).
      */
-    fun reportEvent(name: String, revenue: Double?, currency: String?, properties: Map<String, Any>, link: String?, userId: String?, host: String): Int? {
+    fun reportEvent(name: String, revenue: Double?, currency: String?, properties: Map<String, Any>, link: String?, userId: String?, host: String, variant: String? = null): Int? {
         val body = JSONObject()
             .put("type", "event")
             .put("name", name)
@@ -108,6 +108,7 @@ internal class Click2Client(
                 currency?.let { put("currency", it) }
                 if (properties.isNotEmpty()) put("properties", JSONObject(properties))
                 link?.let { put("url", it) }
+                variant?.let { put("variant", it) }
                 userId?.let { put("userId", it) }
                 appVersion?.let { put("appVersion", it.take(32)) }
             }
@@ -120,6 +121,8 @@ internal class Click2Client(
     private fun headers(): Map<String, String> = buildMap {
         put("Accept", "application/json")
         put("User-Agent", "click2-$platform/$sdkVersion")
+        // For link rules by language (HttpURLConnection sends none by default).
+        put("Accept-Language", java.util.Locale.getDefault().toLanguageTag())
         if (!trackingEnabled()) put("X-Tracking-Disabled", "1")
     }
 

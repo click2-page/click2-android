@@ -54,4 +54,6 @@ data class Click2Link(
     val feature: String?,
     /** The click2 link itself, when it differs from [url] (e.g. [url] is an email click-tracking URL). */
     val linkUrl: String? = null,
+    /** The link rule (`rule:<id>`) or A/B variant that chose the destination, if the link has rules or a split. */
+    val variant: String? = null,
 )

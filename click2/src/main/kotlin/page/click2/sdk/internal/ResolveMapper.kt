@@ -57,6 +57,7 @@ internal object ResolveMapper {
             channel = json.stringOrNull("channel"),
             feature = json.stringOrNull("feature"),
             linkUrl = webUrl(json.stringOrNull("link")),
+            variant = json.stringOrNull("variant"),
         )
     } catch (_: JSONException) {
         null
