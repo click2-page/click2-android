@@ -14,7 +14,7 @@ From Maven Central:
 
 ```kotlin
 dependencies {
-    implementation("page.click2:click2-android:0.3.1")
+    implementation("page.click2:click2-android:0.3.2")
 }
 ```
 
