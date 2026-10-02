@@ -14,7 +14,7 @@ From Maven Central:
 
 ```kotlin
 dependencies {
-    implementation("page.click2:click2-android:0.2.0")
+    implementation("page.click2:click2-android:0.3.1")
 }
 ```
 
@@ -33,7 +33,7 @@ dependencies {
 </intent-filter>
 ```
 
-In the click2 dashboard (Team settings → Android app), add the package name with its signing SHA-256. Use the live team for production and the test environment for staging and debug builds. Then check that the domain verified:
+In the click2 dashboard (Apps & SDKs → App settings), add the package name with its signing SHA-256. Use the live team for production and the test environment for staging and debug builds. Then check that the domain verified:
 
 ```bash
 adb shell pm verify-app-links --re-verify <package>

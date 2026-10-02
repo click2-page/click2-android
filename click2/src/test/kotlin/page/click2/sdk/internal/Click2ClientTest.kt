@@ -221,4 +221,26 @@ class Click2ClientTest {
         assertEquals("utm_source=tiktok&utm_medium=paid", body.getString("referrer"))
         assertFalse(body.has("url"))
     }
+
+    /** A Meta (Facebook/Instagram ads) install referrer: utm_content carries URL-encoded JSON with encrypted hex data. */
+    private fun metaReferrer(hexLength: Int): String {
+        val json = """{"app":1234567890,"t":1700000000,"source":{"data":"${"ab12".repeat(hexLength / 4)}","nonce":"0123456789abcdef01234567"}}"""
+        return "utm_source=apps.facebook.com&utm_campaign=fb4a&utm_content=" + java.net.URLEncoder.encode(json, "UTF-8")
+    }
+
+    @Test
+    fun `long Meta install referrers are sent intact`() {
+        val referrer = metaReferrer(2_800)
+        assertTrue(referrer.length in 2_900..3_100)
+        assertTrue(ReferrerParser.isCampaign(referrer))
+        client({ HttpResponse(204, null) }).reportReferrerInstall(referrer, "acme.click2.page")
+        assertEquals(referrer, JSONObject(requests.single().body!!).getString("referrer"))
+    }
+
+    @Test
+    fun `install referrers are capped at 4000 characters`() {
+        val referrer = metaReferrer(6_000)
+        client({ HttpResponse(204, null) }).reportReferrerInstall(referrer, "acme.click2.page")
+        assertEquals(referrer.take(4_000), JSONObject(requests.single().body!!).getString("referrer"))
+    }
 }

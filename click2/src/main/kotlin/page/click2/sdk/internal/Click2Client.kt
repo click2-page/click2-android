@@ -98,7 +98,7 @@ internal class Click2Client(
     fun reportReferrerInstall(referrer: String, host: String, userId: String? = null): Int? {
         val body = JSONObject()
             .put("type", "install")
-            .put("referrer", referrer.take(1000))
+            .put("referrer", referrer.take(4000))
             .put("platform", platform)
             .apply { appVersion?.let { put("appVersion", it.take(32)) } }
             .apply { userId?.let { put("userId", it) } }
