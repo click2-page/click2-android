@@ -13,6 +13,7 @@ All notable changes to the click2 Android SDK. The format follows [Keep a Change
 ### Tests
 
 - Shared fixture `campaign-referrer.json`: a Meta ads install referrer case (reported as a campaign install).
+
 ### Docs
 
 - README: install snippet at 0.3.1; app settings are now under Apps & SDKs → App settings in the click2 dashboard.
