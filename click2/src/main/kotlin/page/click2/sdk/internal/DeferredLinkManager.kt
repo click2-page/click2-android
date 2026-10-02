@@ -49,6 +49,8 @@ internal class DeferredLinkManager(
     private val trackingEnabled: () -> Boolean,
     /** Installs from a Play Store campaign (UTM tags / gclid) without a click2 link: the raw referrer; blocking. */
     private val reportReferrerInstall: ((String) -> Int?)? = null,
+    /** Whether a referrer without a click2 link is a campaign worth reporting (not an organic Play install). */
+    private val isCampaignReferrer: (String) -> Boolean = ReferrerParser::isCampaign,
 ) {
     private val lock = Any()
     private var work: Deferred<Click2Result?>? = null
@@ -108,7 +110,7 @@ internal class DeferredLinkManager(
         installLink?.let(::sendInstall)
         // No click2 link, but maybe a Play Store campaign: click2 reads its UTM tags (once, best effort).
         val raw = (referrer as? ReferrerResult.Available)?.referrer
-        if (link == null && raw != null && CAMPAIGN_KEYS.any { raw.contains(it) } && trackingEnabled() && reportReferrerInstall != null) {
+        if (link == null && raw != null && isCampaignReferrer(raw) && trackingEnabled() && reportReferrerInstall != null) {
             scope.launch { runCatching { reportReferrerInstall.invoke(raw) }.onFailure { Click2Log.w("referrer install report failed", it) } }
         }
         return link?.let { resolvePending(it) }
@@ -137,8 +139,8 @@ internal class DeferredLinkManager(
                 Click2Log.w("install report failed", e)
                 null
             }
-            // 4xx: the server won't take it later either.
-            if (status != null && status in 200..499) {
+            // 4xx: the server won't take it later either; 408 and 429 mean "try again later".
+            if (status != null && isFinal(status)) {
                 update { if (it.pendingInstallLink == link) it.copy(pendingInstallLink = null) else it }
             }
         }
@@ -150,7 +152,7 @@ internal class DeferredLinkManager(
     companion object {
         const val MAX_ATTEMPTS = 5
 
-        /** Referrer parameters that mean a campaign (UTM tags; Google Ads click ids). */
-        val CAMPAIGN_KEYS = listOf("utm_", "gclid=", "gbraid=", "wbraid=")
+        /** A final answer to an install report: 2xx, or a 4xx other than 408 (timeout) and 429 (rate limited). */
+        fun isFinal(status: Int) = status in 200..499 && status != 408 && status != 429
     }
 }

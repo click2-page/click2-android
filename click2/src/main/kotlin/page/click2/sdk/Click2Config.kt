@@ -4,7 +4,9 @@ package page.click2.sdk
  * @param hosts the team's link hosts this app handles, e.g. `listOf("acme.click2.page")` for
  *   the production build and `listOf("acme-test.click2.page")` for staging. The SDK only
  *   treats links on these hosts as click2 links and only ever calls these hosts. Bare host names
- *   only: no scheme, port, path or user info.
+ *   only: no scheme, port, path or user info. Surrounding spaces, letter case and a trailing dot don't matter.
+ *   The first host is used for reports that have no link of their own (Play Store campaign installs, events
+ *   without a recent link), so list a link host first.
  * @param appVersion reported with opens and installs (e.g. `BuildConfig.VERSION_NAME`).
  * @param timeoutMillis total network budget per call (1 to 60 000 ms), including the one retry
  *   made when a request couldn't reach the server.
@@ -25,7 +27,7 @@ data class Click2Config @JvmOverloads constructor(
     init {
         require(hosts.isNotEmpty()) { "Click2Config needs at least one link host" }
         for (host in hosts) {
-            require(HOST.matches(host)) {
+            require(HOST.matches(host.trim())) {
                 "Invalid click2 host \"$host\": use a bare host name like acme.click2.page " +
                     "(letters, digits, dots and hyphens; no scheme, port, path or user info)"
             }
@@ -35,7 +37,12 @@ data class Click2Config @JvmOverloads constructor(
         require(attributionWindowMillis >= 0) { "attributionWindowMillis can't be negative" }
     }
 
-    private companion object {
+    /** [hosts] trimmed, lowercased and without a trailing dot: what the SDK compares and calls. */
+    internal val linkHosts: List<String> = hosts.map(::normalizeHost).distinct()
+
+    internal companion object {
+        fun normalizeHost(host: String) = host.trim().lowercase().trimEnd('.')
+
         private const val LABEL = "[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?"
         val HOST = Regex("(?=.{1,253}$)$LABEL(?:\\.$LABEL)*\\.?", RegexOption.IGNORE_CASE)
     }

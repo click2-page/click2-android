@@ -73,7 +73,7 @@ object Click2 {
         val app = context.applicationContext
         val prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         Click2Log.enabled = config.logging
-        val matcher = LinkMatcher(config.hosts)
+        val matcher = LinkMatcher(config.linkHosts)
         val client = Click2Client(
             transport = UrlConnectionTransport(),
             platform = PLATFORM,
@@ -95,14 +95,14 @@ object Click2 {
             resolve = { resolveLink(s, it) },
             reportInstall = { link -> matcher.hostOf(link)?.let { client.reportInstall(link, it, prefs.getString(KEY_USER_ID, null)) } ?: 400 },
             trackingEnabled = { prefs.getBoolean(KEY_TRACKING, true) },
-            reportReferrerInstall = { referrer -> client.reportReferrerInstall(referrer, config.hosts.first(), prefs.getString(KEY_USER_ID, null)) },
+            reportReferrerInstall = { referrer -> client.reportReferrerInstall(referrer, config.linkHosts.first(), prefs.getString(KEY_USER_ID, null)) },
         )
         state = s
         if (pendingUserIdSet) {
             userId = pendingUserId
             pendingUserIdSet = false
         }
-        Click2Log.d("configured for ${config.hosts}")
+        Click2Log.d("configured for ${config.linkHosts}")
     }
 
     /**
@@ -247,10 +247,10 @@ object Click2 {
         val age = saved?.let { System.currentTimeMillis() - it.optLong("at", 0L) }
         val savedHost = saved?.optString("host")
         // A negative age means the clock was turned back: don't trust it.
-        val recent = saved != null && age != null && age >= 0 && age <= s.config.attributionWindowMillis && savedHost in s.config.hosts
+        val recent = saved != null && age != null && age >= 0 && age <= s.config.attributionWindowMillis && savedHost in s.config.linkHosts
         val link = if (recent) saved!!.optString("url").takeIf { it.isNotEmpty() } else null
         val variant = if (recent) saved!!.optString("variant").takeIf { it.isNotEmpty() } else null
-        val host = if (recent) savedHost!! else s.config.hosts.first()
+        val host = if (recent) savedHost!! else s.config.linkHosts.first()
         val props = properties.filter { (k, v) ->
             (v is String || v is Number || v is Boolean).also { ok -> if (!ok) Click2Log.w("track: property $k dropped (use text, a number or true/false)") }
         }

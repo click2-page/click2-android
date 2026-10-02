@@ -59,4 +59,13 @@ class SharedFixturesTest {
             assertEquals(c.getString("referrer"), expected, ReferrerParser.smartLink(c.getString("referrer"), matcher))
         }
     }
+
+    @Test
+    fun campaignReferrer() {
+        val cases = Fixtures.load("campaign-referrer.json").cases()
+        assertTrue(cases.isNotEmpty())
+        for (c in cases) {
+            assertEquals(c.getString("referrer"), c.getBoolean("report"), ReferrerParser.isCampaign(c.getString("referrer")))
+        }
+    }
 }

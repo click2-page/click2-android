@@ -106,13 +106,16 @@ Boolean). Nothing is sent while `isTrackingEnabled` is `false`. `track` returns 
 
 Installs from a Play Store campaign link (UTM tags, or `gclid` from Google Ads) without a click2 link are reported
 once with their install referrer; click2 shows them in analytics by channel (`utm_source/utm_medium`, or
-`google_ads`) and campaign. Nothing extra to call.
+`google_ads`) and campaign. Nothing extra to call. Organic Play installs (`utm_source=google-play&utm_medium=organic`)
+and click2 referrers for another host's link aren't reported. They go to the first configured host, so list a link host
+first.
 
 ## Notes
 
 - Uses `HttpURLConnection` and `org.json` from Android, so it can't clash with the app's OkHttp or Ktor versions. The AAR is about 60 KB.
 - `timeoutMillis` (1 to 60 000, default 10 000) is the total time for a call, retry included; `resolve` returns `Failed(NETWORK_ERROR)` when it runs out. A request is retried once, only when it never reached the server (connection refused, DNS failure, TLS handshake); a read timeout or an install report that was already sent is never repeated.
-- Only the configured hosts are ever called. Hosts must be bare host names (`acme.click2.page`): a scheme, port, path, user info or `_` throws in `Click2Config`.
+- Only the configured hosts are ever called. Hosts must be bare host names (`acme.click2.page`): a scheme, port, path, user info or `_` throws in `Click2Config`. Spaces around them, letter case and a trailing dot are ignored.
+- An install report answered with 5xx, 408 or 429 (or not answered) is sent again on a later launch, within the deferred-link window.
 - Links are matched leniently: unencoded `|`, `{}` or `%` in the query still count. Only `https` links on the default port, without user info, match.
 - `OpenWeb.url` is always an `http`/`https` URL, with invalid characters (e.g. spaces) percent-encoded. `Click2Link.webUrl`, `iosUrl` and `androidUrl` are `null` when the server sent none or a non-web URL. A link with an in-app route still routes when its web URL is bad; a link that needs a web URL and has none resolves to `Failed(SERVER_ERROR)`.
 - Nothing is logged unless `logging = true` (logs include link URLs).

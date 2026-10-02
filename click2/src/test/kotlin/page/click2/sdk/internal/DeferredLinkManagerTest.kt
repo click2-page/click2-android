@@ -42,6 +42,7 @@ class DeferredLinkManagerTest {
     private var resolveResult: suspend () -> Click2Result = { route() }
     private val installs = mutableListOf<String>()
     private var installStatus: () -> Int? = { 204 }
+    private val referrerInstalls = mutableListOf<String>()
 
     private fun route() = Click2Result.OpenRoute("orders/subs?id=1", Click2Link(link, null, null, null, null, false, false, null, null, null, null, null, null))
 
@@ -57,6 +58,7 @@ class DeferredLinkManagerTest {
         resolve = { resolved += it; resolveResult() },
         reportInstall = { installs += it; installStatus() },
         trackingEnabled = { tracking },
+        reportReferrerInstall = { referrerInstalls += it; 204 },
     )
 
     private val networkError = Click2Result.Failed(Reason.NETWORK_ERROR, link)
@@ -199,6 +201,21 @@ class DeferredLinkManagerTest {
     }
 
     @Test
+    fun `install is retried after 429 and 408`() = runTest {
+        for (status in listOf(429, 408)) {
+            installStatus = { status }
+            manager().check()
+            advanceUntilIdle()
+            assertEquals("$status", link, store.state.pendingInstallLink)
+        }
+        installStatus = { 204 }
+        manager().check()
+        advanceUntilIdle()
+        assertNull(store.state.pendingInstallLink)
+        assertEquals(3, installs.size)
+    }
+
+    @Test
     fun `install is cleared on 4xx`() = runTest {
         installStatus = { 400 }
         manager().check()
@@ -240,6 +257,23 @@ class DeferredLinkManagerTest {
         assertNull(manager().check())
         assertEquals(1, referrerReads)
         assertEquals(DeferredState(checkedInstallTime = installTime), store.state)
+        advanceUntilIdle()
+        assertTrue("organic installs aren't reported", referrerInstalls.isEmpty())
+    }
+
+    @Test
+    fun `a campaign referrer is reported once, a link for another host is not`() = runTest {
+        referrerResult = ReferrerResult.Available("utm_source=smartlink&smartlink=https%3A%2F%2Fglobex.click2.page%2Fx")
+        assertNull(manager().check())
+        advanceUntilIdle()
+        assertTrue(referrerInstalls.isEmpty())
+
+        store.state = DeferredState()
+        referrerResult = ReferrerResult.Available("utm_source=tiktok&utm_medium=paid")
+        assertNull(manager().check())
+        assertNull(manager().check())
+        advanceUntilIdle()
+        assertEquals(listOf("utm_source=tiktok&utm_medium=paid"), referrerInstalls)
     }
 
     @Test

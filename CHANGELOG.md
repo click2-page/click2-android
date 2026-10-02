@@ -4,6 +4,18 @@ All notable changes to the click2 Android SDK. The format follows [Keep a Change
 
 ## [Unreleased]
 
+### Fixed
+
+- Organic Play installs (`utm_source=google-play&utm_medium=organic`, or google-play with no other campaign keys) and
+  click2 referrers whose link is for another host are no longer reported as campaign installs. Campaign keys are
+  matched as parameter names with a value (`utm_*`, `gclid`, `gbraid`, `wbraid`), not as substrings.
+- Install reports answered with HTTP 408 or 429 are retried on a later launch instead of being treated as final.
+- Configured hosts are normalized once (trimmed, lowercased, trailing dot removed) and that list is used everywhere,
+  so the last link's host matches for `track()` attribution when hosts were configured with capitals or a trailing
+  dot. Surrounding spaces are now accepted instead of throwing.
+- Shared fixtures: an encoded slash in the first path segment (`/api%2Fx`) is decoded before splitting (not a link);
+  new `campaign-referrer.json`.
+
 ## [0.3.0] - 2026-10-01
 
 - Play Store campaign installs (UTM / gclid in the install referrer) without a click2 link are reported for attribution.

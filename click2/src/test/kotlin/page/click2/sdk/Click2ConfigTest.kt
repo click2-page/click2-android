@@ -23,7 +23,6 @@ class Click2ConfigTest {
             "user@acme.click2.page",
             "acme_shop.click2.page",
             "acme.click2.page?x",
-            " acme.click2.page",
             "acme..click2.page",
             "-acme.click2.page",
             "gïanteagle.click2.page",
@@ -34,6 +33,12 @@ class Click2ConfigTest {
             assert(error.message!!.contains("bare host name")) { error.message!! }
         }
         assertThrows(IllegalArgumentException::class.java) { Click2Config(emptyList()) }
+    }
+
+    @Test
+    fun `hosts are normalized once`() {
+        val config = Click2Config(listOf(" Acme.Click2.Page. ", "acme.click2.page", "acme-test.click2.page\n"))
+        assertEquals(listOf("acme.click2.page", "acme-test.click2.page"), config.linkHosts)
     }
 
     @Test
